@@ -1,0 +1,1020 @@
+<!doctype html>
+<html lang="zh-HK">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no" />
+  <title>NailMap HK</title>
+
+  <script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+  <script>
+    tailwind.config = {
+      theme: {
+        extend: {
+          colors: {
+            primary: "#EF9FA9",
+            "primary-hover": "#E57A85",
+            tertiary: "#D32F2F",
+            "background-light": "#FAF8F6",
+            "background-dark": "#3E2C29",
+            "text-main": "#543D37",
+            "text-subtle": "#99827D",
+            "border-subtle": "#EBDAD4",
+            "white-overlay": "#ffffff",
+          },
+          borderRadius: { DEFAULT: "0.5rem", lg: "1rem", xl: "1.5rem", full: "9999px" },
+        }
+      }
+    }
+  </script>
+
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY=" crossorigin="" />
+  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo=" crossorigin=""></script>
+
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@200..800&display=swap" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght@200..700&display=swap" rel="stylesheet">
+
+  <style>
+    body { font-family: "Plus Jakarta Sans", system-ui, -apple-system, "PingFang TC", "Microsoft JhengHei", sans-serif; letter-spacing: .1px; }
+    @media (min-width: 768px){ body{ font-size:14px; } }
+
+    ::-webkit-scrollbar { width: 8px; }
+    ::-webkit-scrollbar-track { background: transparent; }
+    ::-webkit-scrollbar-thumb { background: #EBDAD4; border-radius: 999px; }
+    ::-webkit-scrollbar-thumb:hover { background: #d4c4b6; }
+    #mapDesktop, #mapMobile { width: 100%; height: 100%; z-index: 1; }
+    .no-scrollbar::-webkit-scrollbar { display: none; }
+    .no-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
+    .leaflet-container { font: inherit; }
+    .pg-btn[disabled] { opacity: .45; pointer-events: none; }
+  </style>
+</head>
+
+<body class="bg-background-light text-text-main flex flex-col h-dvh overflow-hidden">
+
+  <header class="flex-none z-20 bg-white-overlay border-b border-border-subtle px-5 py-3 lg:px-10">
+    <div class="flex items-center w-full max-w-[1920px] mx-auto">
+      <div class="flex-1 flex items-center gap-3">
+        <div class="size-9 text-primary bg-background-light rounded-full flex items-center justify-center border border-border-subtle">
+          <span class="material-symbols-outlined" style="font-size: 20px;">spa</span>
+        </div>
+        <div class="leading-tight">
+          <div class="text-lg font-semibold tracking-tight">NailMap HK</div>
+          <div class="text-[11px] tracking-wide text-text-subtle">香港美甲店資料庫</div>
+        </div>
+      </div>
+
+      <div class="hidden md:block w-[560px] mx-4">
+        <label class="relative block">
+          <span class="material-symbols-outlined absolute left-3 top-1/2 -translate-y-1/2 text-text-subtle">search</span>
+          <input id="qTop"
+            class="w-full h-10 rounded-xl border border-border-subtle bg-white pl-10 pr-3 text-[13px] focus:outline-none focus:ring-2 focus:ring-primary/20 transition-all"
+            placeholder="搜尋：店名／地區（Lai Chi Kok）／Tag…"
+          />
+        </label>
+      </div>
+
+      <div class="flex-1 flex justify-end">
+        <div class="hidden"></div>
+      </div>
+    </div>
+  </header>
+
+  <div class="flex-none md:hidden px-4 pt-4">
+    <div class="flex items-center gap-2 bg-white border border-border-subtle rounded-full p-1 shadow-sm">
+      <button id="tabList" class="flex-1 h-10 rounded-full font-semibold text-[13px] bg-text-main text-white transition-colors">List</button>
+      <button id="tabMap" class="flex-1 h-10 rounded-full font-semibold text-[13px] text-text-main hover:bg-background-light transition-colors">Map</button>
+    </div>
+  </div>
+
+  <main class="flex-1 min-h-0 w-full max-w-[1920px] mx-auto flex overflow-hidden relative">
+
+    <!-- ✅ Desktop：List 65% / Map 35% -->
+    <section id="panelList" class="w-full md:w-[65%] xl:w-[60%] h-full bg-background-light relative z-10 md:shadow-none overflow-hidden flex flex-col">
+      <div class="flex-none px-4 md:px-5 py-4 bg-background-light/95 backdrop-blur-sm border-b border-border-subtle flex flex-col gap-3">
+        <label class="relative block md:hidden">
+          <span class="material-symbols-outlined absolute left-3 top-1/2 -translate-y-1/2 text-text-subtle">search</span>
+          <input id="qMobile" class="w-full h-11 rounded-xl border border-border-subtle bg-white pl-10 pr-3 text-[13px] focus:outline-none focus:ring-2 focus:ring-primary/20" placeholder="搜尋：店名 / 地區 / Tag…" />
+        </label>
+
+        <div class="flex gap-2 overflow-x-auto pb-1 no-scrollbar">
+          <button id="btnNearMe" class="flex h-9 shrink-0 items-center justify-center gap-x-2 rounded-full bg-white border border-border-subtle px-4 hover:border-primary hover:text-primary transition-colors">
+            <span class="material-symbols-outlined text-[18px]">my_location</span>
+            <span class="text-[13px] font-medium">Near Me</span>
+          </button>
+          <button id="btnHasCoords" class="flex h-9 shrink-0 items-center justify-center gap-x-2 rounded-full bg-white border border-border-subtle px-4 hover:border-primary hover:text-primary transition-colors">
+            <span class="text-[13px] font-medium">有地圖座標</span>
+          </button>
+
+          <button data-tag="$" class="tagChip flex h-9 shrink-0 items-center justify-center gap-x-2 rounded-full bg-white border border-border-subtle px-4 hover:border-primary hover:text-primary transition-colors">
+            <span class="text-[13px] font-medium">$</span>
+          </button>
+          <button data-tag="$$" class="tagChip flex h-9 shrink-0 items-center justify-center gap-x-2 rounded-full bg-white border border-border-subtle px-4 hover:border-primary hover:text-primary transition-colors">
+            <span class="text-[13px] font-medium">$$</span>
+          </button>
+          <button data-tag="$$$" class="tagChip flex h-9 shrink-0 items-center justify-center gap-x-2 rounded-full bg-white border border-border-subtle px-4 hover:border-primary hover:text-primary transition-colors">
+            <span class="text-[13px] font-medium">$$$</span>
+          </button>
+          <button data-tag="$$$$" class="tagChip flex h-9 shrink-0 items-center justify-center gap-x-2 rounded-full bg-white border border-border-subtle px-4 hover:border-primary hover:text-primary transition-colors">
+            <span class="text-[13px] font-medium">$$$$</span>
+          </button>
+          <button data-tag="$$$$$" class="tagChip flex h-9 shrink-0 items-center justify-center gap-x-2 rounded-full bg-white border border-border-subtle px-4 hover:border-primary hover:text-primary transition-colors">
+            <span class="text-[13px] font-medium">$$$$$</span>
+          </button>
+
+          <button data-tag="Soft Gel" class="tagChip flex h-9 shrink-0 items-center justify-center gap-x-2 rounded-full bg-white border border-border-subtle px-4 hover:border-primary hover:text-primary transition-colors">
+            <span class="text-[13px] font-medium">Soft Gel</span>
+          </button>
+          <button data-tag="Hard Gel" class="tagChip flex h-9 shrink-0 items-center justify-center gap-x-2 rounded-full bg-white border border-border-subtle px-4 hover:border-primary hover:text-primary transition-colors">
+            <span class="text-[13px] font-medium">Hard Gel</span>
+          </button>
+          <button data-tag="Nail Art" class="tagChip flex h-9 shrink-0 items-center justify-center gap-x-2 rounded-full bg-white border border-border-subtle px-4 hover:border-primary hover:text-primary transition-colors">
+            <span class="text-[13px] font-medium">Nail Art</span>
+          </button>
+          <button data-tag="Japanese Style" class="tagChip flex h-9 shrink-0 items-center justify-center gap-x-2 rounded-full bg-white border border-border-subtle px-4 hover:border-primary hover:text-primary transition-colors">
+            <span class="text-[13px] font-medium">Japanese Style</span>
+          </button>
+        </div>
+
+        <div class="flex items-center justify-between gap-3">
+          <h1 class="text-text-main text-[15px] font-semibold tracking-tight shrink-0">
+            <span id="countText">—</span>個結果
+          </h1>
+
+          <div class="flex items-center gap-2 flex-wrap justify-end">
+            <div class="flex items-center gap-2 shrink-0">
+              <span class="text-[11px] text-text-subtle font-semibold">排序</span>
+              <select id="sortSelect"
+                class="h-9 rounded-full border border-border-subtle bg-white px-3 text-[13px] focus:outline-none focus:ring-2 focus:ring-primary/20">
+                <option value="updated" selected>最後更新</option>
+                <option value="price_low">價錢由低到高</option>
+                <option value="price_high">價錢由高到低</option>
+              </select>
+            </div>
+
+            <div id="pagerTop" class="flex items-center gap-1.5"></div>
+
+            <button id="btnReset" class="text-[13px] text-text-subtle hover:text-text-main inline-flex items-center gap-1 ml-1">
+              <span class="material-symbols-outlined text-[18px]">restart_alt</span>
+              Reset
+            </button>
+          </div>
+        </div>
+
+        <div id="bannerWarn" class="hidden text-[13px] bg-white border border-border-subtle text-text-main rounded-xl px-4 py-3">
+          <div class="font-semibold mb-1">提示</div>
+          <div id="warnText" class="text-text-subtle text-[11px]"></div>
+        </div>
+      </div>
+
+      <div class="flex-1 overflow-y-auto px-4 md:px-5 py-5 overscroll-contain">
+        <div id="list" class="flex flex-col gap-3 max-w-3xl mx-auto"></div>
+
+        <div class="pt-5 pb-3 flex justify-center">
+          <div id="pagerBottom" class="flex items-center gap-1.5"></div>
+        </div>
+      </div>
+    </section>
+
+    <section class="hidden md:block md:w-[35%] xl:w-[40%] h-full relative">
+      <div class="absolute inset-0" id="mapDesktop"></div>
+      <div class="absolute top-4 right-4 flex flex-col gap-2 z-[1000]">
+        <button id="btnLocateDesktop" class="bg-white p-2 rounded-lg shadow-md text-text-subtle hover:text-text-main transition-colors">
+          <span class="material-symbols-outlined">my_location</span>
+        </button>
+        <div class="flex flex-col bg-white rounded-lg shadow-md overflow-hidden">
+          <button id="btnZoomInDesktop" class="p-2 text-text-subtle hover:text-text-main transition-colors border-b border-gray-100">
+            <span class="material-symbols-outlined">add</span>
+          </button>
+          <button id="btnZoomOutDesktop" class="p-2 text-text-subtle hover:text-text-main transition-colors">
+            <span class="material-symbols-outlined">remove</span>
+          </button>
+        </div>
+      </div>
+    </section>
+
+    <section id="panelMapMobile" class="md:hidden hidden w-full h-full relative">
+      <div class="absolute inset-0" id="mapMobile"></div>
+      <div class="absolute top-4 right-4 flex flex-col gap-2 z-[1000]">
+        <button id="btnLocateMobile" class="bg-white p-2 rounded-lg shadow-md text-text-subtle hover:text-text-main transition-colors">
+          <span class="material-symbols-outlined">my_location</span>
+        </button>
+        <div class="flex flex-col bg-white rounded-lg shadow-md overflow-hidden">
+          <button id="btnZoomInMobile" class="p-2 text-text-subtle hover:text-text-main transition-colors border-b border-gray-100">
+            <span class="material-symbols-outlined">add</span>
+          </button>
+          <button id="btnZoomOutMobile" class="p-2 text-text-subtle hover:text-text-main transition-colors">
+            <span class="material-symbols-outlined">remove</span>
+          </button>
+        </div>
+      </div>
+    </section>
+  </main>
+
+<script>
+/* =========================
+   CONFIG
+========================= */
+const API_URL = "https://script.google.com/macros/s/AKfycbzWRh14SK5_MgsyLGGm8V7mu2QsD3r4w1M6ME-0h6tWJJChj2YITcp4tR8xFBzhke1LCg/exec";
+
+/* =========================
+   Global Safety Nets
+========================= */
+window.addEventListener("unhandledrejection", (e) => {
+  console.warn("Unhandled promise rejection (ignored to keep UI running):", e.reason);
+});
+window.addEventListener("error", (e) => {
+  console.warn("Window error:", e.message);
+});
+
+/* =========================
+   Safe Storage Wrapper
+========================= */
+function storageGet(key) {
+  try { return localStorage.getItem(key); } catch { return null; }
+}
+function storageSet(key, val) {
+  try { localStorage.setItem(key, val); } catch { /* ignore */ }
+}
+
+/* =========================
+   Helpers
+========================= */
+function norm(str) {
+  return String(str || "")
+    .toLowerCase()
+    .normalize("NFKD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .replace(/[^a-z0-9\u4e00-\u9fff]+/g, " ")
+    .replace(/\s+/g, " ")
+    .trim();
+}
+
+function splitList(v) {
+  if (Array.isArray(v)) return v.map(x => String(x).trim()).filter(Boolean);
+  const s = String(v || "").trim();
+  if (!s) return [];
+  return s.split(",").map(x => x.trim()).filter(Boolean);
+}
+
+function toBool(v) {
+  const s = String(v || "").toLowerCase().trim();
+  return s === "yes" || s === "true" || s === "1";
+}
+
+function toNum(v) {
+  if (v === "" || v == null) return null;
+  const n = Number(v);
+  return Number.isFinite(n) ? n : null;
+}
+
+function haversineKm(aLat, aLng, bLat, bLng) {
+  const R = 6371;
+  const toRad = d => d * Math.PI / 180;
+  const dLat = toRad(bLat - aLat);
+  const dLng = toRad(bLng - aLng);
+  const s1 = Math.sin(dLat/2) ** 2;
+  const s2 = Math.cos(toRad(aLat)) * Math.cos(toRad(bLat)) * (Math.sin(dLng/2) ** 2);
+  return 2 * R * Math.asin(Math.sqrt(s1 + s2));
+}
+
+function escapeHtml(str="") {
+  return String(str).replace(/[&<>"']/g, (m) => ({ "&":"&amp;", "<":"&lt;", ">":"&gt;", '"':"&quot;", "'":"&#039;" }[m]));
+}
+
+function debounce(func, wait) {
+  let timeout;
+  return function(...args) {
+    clearTimeout(timeout);
+    timeout = setTimeout(() => func.apply(this, args), wait);
+  };
+}
+
+// "Dec 15 2025"
+function formatDate(dateStr) {
+  if (!dateStr) return "";
+  const d = new Date(dateStr);
+  if (isNaN(d.getTime())) return dateStr;
+  return d.toLocaleDateString('en-US', { year: 'numeric', month: 'short', day: 'numeric' }).replace(/,/g, "");
+}
+
+/* =========================
+   Price & Updated sort keys
+========================= */
+const TIER_BOUNDS = {
+  "$": [0, 199],
+  "$$": [200, 499],
+  "$$$": [500, 799],
+  "$$$$": [800, 1299],
+  "$$$$$": [1300, 999999]
+};
+
+function extractMinMaxPriceFromSalon(s) {
+  const rawStr = `${s.price_range_hkd || ""} ${s.price_tier_min || ""} ${s.price_tier_max || ""}`;
+  const nums = rawStr.match(/\d+/g)?.map(n => parseInt(n, 10)).filter(n => Number.isFinite(n));
+
+  if (nums && nums.length) {
+    nums.sort((a,b)=>a-b);
+    return { min: nums[0], max: nums[nums.length - 1] };
+  }
+
+  const tMin = (s.price_tier_min || "").trim();
+  const tMax = (s.price_tier_max || "").trim() || tMin;
+
+  if (TIER_BOUNDS[tMin] || TIER_BOUNDS[tMax]) {
+    const min = (TIER_BOUNDS[tMin] ? TIER_BOUNDS[tMin][0] : TIER_BOUNDS["$"][0]);
+    const max = (TIER_BOUNDS[tMax] ? TIER_BOUNDS[tMax][1] : (TIER_BOUNDS[tMin]?.[1] ?? TIER_BOUNDS["$$$$$"][1]));
+    return { min, max };
+  }
+
+  return { min: null, max: null };
+}
+
+/* =========================
+   Price Display
+========================= */
+const TIER_RANGES = {
+  "$": { min: "200以下", max: "199" },
+  "$$": { min: "200", max: "499" },
+  "$$$": { min: "500", max: "799" },
+  "$$$$": { min: "800", max: "1299" },
+  "$$$$$": { min: "1300", max: "1300以上" }
+};
+
+function getTierSymbol(val) {
+  if (val < 200) return "$";
+  if (val < 500) return "$$";
+  if (val < 800) return "$$$";
+  if (val < 1300) return "$$$$";
+  return "$$$$$";
+}
+
+function formatPriceDisplay(s) {
+  const sheetMinTier = (s.price_tier_min || "").trim();
+  const sheetMaxTier = (s.price_tier_max || "").trim();
+  const sheetRange = (s.price_range_hkd || "").trim();
+
+  let rawStr = sheetRange + " " + sheetMinTier + " " + sheetMaxTier;
+  let numbers = rawStr.match(/\d+/g);
+
+  let displayTier = "";
+  let displayRange = "";
+
+  if (numbers && numbers.length > 0) {
+    let nums = numbers.map(n => parseInt(n, 10)).sort((a, b) => a - b);
+    let minP = nums[0];
+    let maxP = nums[nums.length - 1];
+
+    let t1 = getTierSymbol(minP);
+    let t2 = getTierSymbol(maxP);
+    displayTier = (t1 === t2) ? t1 : `${t1}-${t2}`;
+    displayRange = (minP === maxP) ? `HKD${minP}` : `HKD${minP}－${maxP}`;
+  } else {
+    let tMin = sheetMinTier || "$";
+    let tMax = sheetMaxTier || tMin;
+    displayTier = (tMin === tMax) ? tMin : `${tMin}-${tMax}`;
+
+    let rangeLow = TIER_RANGES[tMin]?.min || "???";
+    let rangeHigh = TIER_RANGES[tMax]?.max || "???";
+    displayRange = `HKD${rangeLow}－${rangeHigh}`;
+  }
+
+  return `${displayTier} 大約（${displayRange}）`;
+}
+
+/* =========================
+   Search Synonyms
+========================= */
+const DISTRICT_SYNONYMS = [
+  { en: ["laichikok", "lai chi kok", "laichilok", "lai chi lok", "lck"], zh: ["荔枝角"] },
+  { en: ["cheungshawan", "cheung sha wan", "changshawan", "csw"], zh: ["長沙灣"] },
+  { en: ["shamshuipo", "sham shui po", "ssp"], zh: ["深水埗"] },
+  { en: ["mongkok", "mong kok", "mk"], zh: ["旺角"] },
+  { en: ["tsimshatsui", "tsim sha tsui", "tst"], zh: ["尖沙咀"] },
+  { en: ["causewaybay", "causeway bay", "cwb"], zh: ["銅鑼灣"] },
+  { en: ["wanchai", "wan chai"], zh: ["灣仔"] },
+  { en: ["central"], zh: ["中環"] },
+  { en: ["sheungwan", "sheung wan"], zh: ["上環"] },
+];
+
+function expandQueryVariants(q) {
+  const raw = String(q || "");
+  const n = norm(raw);
+  if (!n) return [];
+  const vars = new Set([n]);
+  for (const item of DISTRICT_SYNONYMS) {
+    const allKeywords = [...item.en, ...item.zh];
+    const isHit = allKeywords.some(k => n.includes(norm(k)));
+    if (isHit) allKeywords.forEach(k => vars.add(norm(k)));
+  }
+  return [...vars];
+}
+
+/* =========================
+   Data & State
+========================= */
+let SALONS = [];
+let state = {
+  q: "",
+  activeTags: new Set(),
+  nearMeMode: false,
+  userLoc: null,
+  requireCoords: false,
+  sortMode: "updated"
+};
+
+let pageSize = 15;
+let page = 1;
+
+const FAV_KEY = "nailmap_favs_v1";
+function getFavSet() {
+  try {
+    const raw = storageGet(FAV_KEY);
+    return new Set(JSON.parse(raw || "[]"));
+  } catch {
+    return new Set();
+  }
+}
+function saveFavSet(set) {
+  try { storageSet(FAV_KEY, JSON.stringify([...set])); } catch { /* ignore */ }
+}
+
+/* =========================
+   Map Init
+========================= */
+const defaultCenter = [22.3369, 114.1476];
+const defaultZoom = 12;
+
+const mapDesktop = L.map("mapDesktop", { zoomControl: false }).setView(defaultCenter, defaultZoom);
+const mapMobile  = L.map("mapMobile",  { zoomControl: false }).setView(defaultCenter, defaultZoom);
+
+L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", { maxZoom: 19, attribution: "&copy; OpenStreetMap" }).addTo(mapDesktop);
+L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", { maxZoom: 19, attribution: "&copy; OpenStreetMap" }).addTo(mapMobile);
+
+const layerDesktop = L.layerGroup().addTo(mapDesktop);
+const layerMobile  = L.layerGroup().addTo(mapMobile);
+
+let userMarkerDesktop = null;
+let userMarkerMobile  = null;
+function setUserMarker(lat, lng) {
+  if (userMarkerDesktop) layerDesktop.removeLayer(userMarkerDesktop);
+  if (userMarkerMobile)  layerMobile.removeLayer(userMarkerMobile);
+  const opt = { radius: 8, weight: 2, fillOpacity: 0.25 };
+  userMarkerDesktop = L.circleMarker([lat,lng], opt).addTo(layerDesktop).bindPopup("你而家位置");
+  userMarkerMobile  = L.circleMarker([lat,lng], opt).addTo(layerMobile).bindPopup("你而家位置");
+}
+
+/* =========================
+   Smart Robust Normalization
+========================= */
+function normalizeSalon(raw) {
+  const lookup = {};
+  Object.keys(raw).forEach(k => {
+    const cleanKey = k.toString().toLowerCase().replace(/[^a-z0-9]/g, "");
+    lookup[cleanKey] = raw[k];
+  });
+
+  const getVal = (targetKeys) => {
+    for (const t of targetKeys) {
+      const cleanTarget = t.toLowerCase().replace(/[^a-z0-9]/g, "");
+      const val = lookup[cleanTarget];
+      if (val !== undefined && val !== null && String(val) !== "") return val;
+    }
+    return "";
+  };
+
+  const s = {};
+  s.id = String(getVal(["id"]) || "").trim();
+  s.name = String(getVal(["name", "shop_name"]) || "").trim();
+  s.district = String(getVal(["district"]) || "").trim();
+  s.district_en = String(getVal(["district_en"]) || "").trim();
+
+  s.price_tier_min = String(getVal(["price_tier_min", "min_price"]) || "").trim();
+  s.price_tier_max = String(getVal(["price_tier_max", "max_price"]) || "").trim();
+  s.price_range_hkd = String(getVal(["price_range_hkd", "price_range"]) || "").trim();
+
+  s.lat = toNum(getVal(["lat", "latitude"]));
+  s.lng = toNum(getVal(["lng", "longitude"]));
+
+  s.tags = splitList(getVal(["tags"]));
+  s.aliases = splitList(getVal(["aliases"]));
+  s.address_display = String(getVal(["address_display", "address"]) || "").trim();
+  s.note = String(getVal(["note"]) || "").trim();
+  s.source_url = String(getVal(["source_url", "url"]) || "").trim();
+
+  s.show_updated = toBool(getVal(["show_updated"]));
+  s.show_note = toBool(getVal(["show_note"]));
+  s.public_info = toBool(getVal(["public_info"]));
+
+  const verifiedRaw = String(getVal(["last_verified"]) || "").trim();
+  s.last_verified = formatDate(verifiedRaw);
+
+  const ts = new Date(verifiedRaw).getTime();
+  s._lastVerifiedTs = Number.isFinite(ts) ? ts : 0;
+
+  const mm = extractMinMaxPriceFromSalon(s);
+  s._priceMin = (mm.min == null) ? null : mm.min;
+  s._priceMax = (mm.max == null) ? null : mm.max;
+
+  const st = String(getVal(["status"]) || "").trim().toLowerCase();
+  s.status = st || "active";
+
+  return s;
+}
+
+function getSearchBlob(s) {
+  const fields = [s.id, s.name, s.district, s.district_en, s.location_type, s.address_display, s.note, s.source_url, ...(s.tags || []), ...(s.aliases || [])];
+  return norm(fields.join(" "));
+}
+
+function matchesQuery(s, q) {
+  if (!q) return true;
+  const blob = getSearchBlob(s);
+  const variants = expandQueryVariants(q);
+  return variants.some(v => blob.includes(v));
+}
+
+function matchesTags(s, tagsSet) {
+  if (tagsSet.size === 0) return true;
+
+  const itemTags = new Set((s.tags || []).map(t => t.toLowerCase()));
+
+  let rawStr = (s.price_range_hkd || "") + " " + (s.price_tier_min || "");
+  let numbers = rawStr.match(/\d+/g);
+  if (numbers && numbers.length > 0) {
+    let nums = numbers.map(n => parseInt(n, 10));
+    let minP = Math.min(...nums);
+    let maxP = Math.max(...nums);
+    if (minP < 200) itemTags.add("$");
+    if (maxP >= 200 && minP < 500) itemTags.add("$$");
+    if (maxP >= 500 && minP < 800) itemTags.add("$$$");
+    if (maxP >= 800 && minP < 1300) itemTags.add("$$$$");
+    if (maxP >= 1300) itemTags.add("$$$$$");
+  } else {
+    if (s.price_tier_min) itemTags.add(s.price_tier_min.toLowerCase());
+    if (s.price_tier_max) itemTags.add(s.price_tier_max.toLowerCase());
+  }
+
+  for (const tag of tagsSet) {
+    if (!itemTags.has(tag.toLowerCase())) return false;
+  }
+  return true;
+}
+
+function isActiveStatus(s) {
+  const st = String(s.status || "").toLowerCase().trim();
+  return st === "" || st === "active";
+}
+
+function sortItems(items) {
+  if (state.nearMeMode && state.userLoc) return items;
+
+  if (state.sortMode === "updated") {
+    return items.sort((a,b) => (b._lastVerifiedTs || 0) - (a._lastVerifiedTs || 0));
+  }
+
+  if (state.sortMode === "price_low") {
+    return items.sort((a,b) => {
+      const av = (a._priceMin == null) ? Number.POSITIVE_INFINITY : a._priceMin;
+      const bv = (b._priceMin == null) ? Number.POSITIVE_INFINITY : b._priceMin;
+      return av - bv;
+    });
+  }
+
+  if (state.sortMode === "price_high") {
+    return items.sort((a,b) => {
+      const av = (a._priceMax == null) ? Number.NEGATIVE_INFINITY : a._priceMax;
+      const bv = (b._priceMax == null) ? Number.NEGATIVE_INFINITY : b._priceMax;
+      return bv - av;
+    });
+  }
+
+  return items;
+}
+
+function getFilteredAll() {
+  let items = SALONS
+    .filter(isActiveStatus)
+    .filter(s => matchesQuery(s, state.q))
+    .filter(s => matchesTags(s, state.activeTags));
+
+  if (state.requireCoords) items = items.filter(s => Number.isFinite(s.lat) && Number.isFinite(s.lng));
+
+  if (state.nearMeMode && state.userLoc) {
+    items = items.map(s => {
+      const has = Number.isFinite(s.lat) && Number.isFinite(s.lng);
+      return { ...s, _km: has ? haversineKm(state.userLoc.lat, state.userLoc.lng, s.lat, s.lng) : null };
+    }).sort((a,b) => {
+      if (a._km == null) return 1;
+      if (b._km == null) return -1;
+      return a._km - b._km;
+    });
+    return items;
+  }
+
+  return sortItems(items);
+}
+
+/* =========================
+   Pagination UI
+========================= */
+function calcTotalPages(total) {
+  const pages = Math.ceil(total / pageSize);
+  return Math.max(1, pages);
+}
+
+function clampPage(p, totalPages) {
+  if (p < 1) return 1;
+  if (p > totalPages) return totalPages;
+  return p;
+}
+
+function buildPageWindow(cur, totalPages, windowSize=5) {
+  const half = Math.floor(windowSize / 2);
+  let start = cur - half;
+  let end = cur + half;
+
+  if (start < 1) { end += (1 - start); start = 1; }
+  if (end > totalPages) { start -= (end - totalPages); end = totalPages; }
+  if (start < 1) start = 1;
+
+  const pages = [];
+  for (let i = start; i <= end; i++) pages.push(i);
+  return pages;
+}
+
+function pagerButton(label, onClick, opts={}) {
+  const { disabled=false, active=false } = opts;
+  const cls = [
+    "pg-btn h-9 px-3 rounded-full border text-[13px] font-semibold transition-colors",
+    active ? "bg-text-main text-white border-text-main" : "bg-white text-text-main border-border-subtle hover:border-primary hover:text-primary",
+  ].join(" ");
+  return `<button ${disabled ? "disabled" : ""} class="${cls}" data-pg="${label}">${label}</button>`;
+}
+
+function renderPagination(containerId, total, totalPages) {
+  const el = document.getElementById(containerId);
+  if (!el) return;
+
+  const cur = clampPage(page, totalPages);
+  page = cur;
+
+  const isFirst = (cur === 1);
+  const isLast = (cur === totalPages);
+
+  const pages = buildPageWindow(cur, totalPages, 5);
+
+  let html = "";
+  html += pagerButton("第一頁", null, { disabled: isFirst });
+  html += pagerButton("上一頁", null, { disabled: isFirst });
+
+  for (const p of pages) {
+    html += pagerButton(String(p), null, { active: p === cur });
+  }
+
+  html += pagerButton("下一頁", null, { disabled: isLast });
+  html += pagerButton("最後一頁", null, { disabled: isLast });
+
+  el.innerHTML = html;
+
+  el.querySelectorAll("button[data-pg]").forEach(btn => {
+    btn.addEventListener("click", () => {
+      const label = btn.getAttribute("data-pg");
+      if (!label) return;
+
+      if (label === "第一頁") page = 1;
+      else if (label === "上一頁") page = Math.max(1, page - 1);
+      else if (label === "下一頁") page = Math.min(totalPages, page + 1);
+      else if (label === "最後一頁") page = totalPages;
+      else {
+        const n = parseInt(label, 10);
+        if (Number.isFinite(n)) page = n;
+      }
+      syncAll();
+      const scroller = document.querySelector("#panelList .overflow-y-auto");
+      if (scroller) scroller.scrollTo({ top: 0, behavior: "smooth" });
+    });
+  });
+}
+
+/* =========================
+   Render
+========================= */
+const FAV_ICON_SIZE = 20;
+
+function renderList(allItems) {
+  const favs = getFavSet();
+  const list = document.getElementById("list");
+
+  const total = allItems.length;
+  const totalPages = calcTotalPages(total);
+
+  page = clampPage(page, totalPages);
+
+  const start = (page - 1) * pageSize;
+  const shown = allItems.slice(start, start + pageSize);
+
+  list.innerHTML = shown.map(s => {
+    const price = formatPriceDisplay(s);
+    const distance = (state.nearMeMode && state.userLoc && s._km != null)
+      ? `<span class="text-[11px] font-semibold text-text-subtle">${s._km.toFixed(2)} km</span>` : "";
+
+    const tags = (s.tags || []).slice(0, 5)
+      .map(t => `<span class="px-2 py-1 bg-background-light rounded text-[11px] font-medium text-text-subtle">${escapeHtml(t)}</span>`)
+      .join("");
+
+    const hasCoords = Number.isFinite(s.lat) && Number.isFinite(s.lng);
+    const favOn = favs.has(s.id);
+    const heartClass = favOn ? "text-tertiary" : "text-text-subtle";
+
+    const updatedHtml = (s.show_updated && s.last_verified)
+      ? `<span class="text-[10px] text-text-subtle/80 ml-auto bg-background-light px-1.5 py-0.5 rounded border border-border-subtle/50">Updated as ${escapeHtml(s.last_verified)}</span>`
+      : "";
+
+    const noteHtml = (s.show_note && s.note)
+      ? `<div class="text-[12px] text-text-subtle mt-1">${escapeHtml(s.note)}</div>`
+      : "";
+
+    const publicInfoHtml = (s.public_info)
+      ? `<div class="text-[10px] text-text-subtle/80 mt-1 text-right">資料來源：公開可查閱資料，實際資訊以商戶最新公佈為準</div>`
+      : "";
+
+    const pinHintHtml = hasCoords
+      ? ""
+      : `<p class="text-[11px] text-text-subtle mt-1">（未能找到地址，地圖無法顯示）</p>`;
+
+    return `
+      <article data-id="${escapeHtml(s.id)}" class="salonCard group bg-white rounded-lg p-4 border border-border-subtle hover:border-primary/30 transition-colors cursor-pointer">
+        <div class="flex flex-col gap-3">
+          <div class="flex items-start justify-between gap-3">
+            <div>
+              <h3 class="text-[15px] font-semibold tracking-tight text-text-main leading-snug group-hover:text-primary-hover transition-colors">${escapeHtml(s.name)}</h3>
+              <p class="text-text-subtle text-[13px] mt-1">
+                ${escapeHtml(s.district || "—")}
+                ${s.district_en ? ` • ${escapeHtml(s.district_en)}` : ""}
+                ${price ? ` • <span class="font-semibold text-text-main">${escapeHtml(price)}</span>` : ""}
+              </p>
+              ${pinHintHtml}
+            </div>
+            <div class="flex flex-col items-end gap-1">
+              ${distance}
+              <button data-fav="${escapeHtml(s.id)}" class="btnFav p-1.5 bg-white border border-border-subtle rounded-full hover:bg-background-light">
+                <span class="material-symbols-outlined ${heartClass}" style="font-size:${FAV_ICON_SIZE}px;">favorite</span>
+              </button>
+            </div>
+          </div>
+          <div class="flex flex-wrap gap-2">${tags}</div>
+          <div class="pt-3 border-t border-background-light">
+            <div class="text-[13px] text-text-main">
+              <span class="material-symbols-outlined align-[-5px] text-[18px] text-text-subtle">location_on</span>
+              ${escapeHtml(s.address_display || "—")}
+            </div>
+            ${noteHtml}
+            <div class="mt-2 flex flex-col">
+              <div class="flex items-center justify-between">
+                ${s.source_url ? `<a href="${s.source_url}" target="_blank" class="text-[12px] text-primary-hover underline">Source</a>` : "<span></span>"}
+                ${updatedHtml}
+              </div>
+              ${publicInfoHtml}
+            </div>
+          </div>
+        </div>
+      </article>
+    `;
+  }).join("");
+
+  document.getElementById("countText").textContent = total;
+
+  renderPagination("pagerTop", total, totalPages);
+  renderPagination("pagerBottom", total, totalPages);
+}
+
+function renderMarkers(allItems) {
+  layerDesktop.clearLayers();
+  layerMobile.clearLayers();
+  if (state.userLoc) setUserMarker(state.userLoc.lat, state.userLoc.lng);
+
+  const withCoords = allItems.filter(s => Number.isFinite(s.lat) && Number.isFinite(s.lng));
+
+  withCoords.forEach(s => {
+    const price = formatPriceDisplay(s);
+    const tags = (s.tags || []).slice(0, 4)
+      .map(t => `<span style="display:inline-block;margin:2px 2px 0 0;padding:2px 6px;border:1px solid #EBDAD4;border-radius:999px;font-size:10px;">${escapeHtml(t)}</span>`)
+      .join("");
+
+    const updatedHtml = (s.show_updated && s.last_verified)
+      ? `<div style="margin-top:4px;font-size:9px;color:#999;text-align:right;">Updated as ${escapeHtml(s.last_verified)}</div>`
+      : "";
+
+    const publicInfoHtml = (s.public_info)
+      ? `<div style="margin-top:2px;font-size:9px;color:#999;text-align:right;">資料來源：公開可查閱資料，實際資訊以商戶最新公佈為準</div>`
+      : "";
+
+    const html = `
+      <div style="min-width:220px;">
+        <div style="font-weight:700;font-size:14px;color:#543D37;letter-spacing:.1px;">${escapeHtml(s.name)}</div>
+        <div style="margin-top:4px;font-size:12px;color:#99827D;">${escapeHtml(s.district)} ${price ? `• <b>${escapeHtml(price)}</b>` : ""}</div>
+        <div style="margin-top:6px;font-size:13px;">${escapeHtml(s.address_display)}</div>
+        <div style="margin-top:6px;">${tags}</div>
+        ${updatedHtml}
+        ${publicInfoHtml}
+        ${s.source_url ? `<div style="margin-top:6px;"><a href="${s.source_url}" target="_blank" style="color:#E57A85;">Source</a></div>` : ""}
+      </div>
+    `;
+    const m1 = L.marker([s.lat, s.lng]).addTo(layerDesktop).bindPopup(html);
+    const m2 = L.marker([s.lat, s.lng]).addTo(layerMobile).bindPopup(html);
+    m1._salonId = s.id; m2._salonId = s.id;
+  });
+
+  if (withCoords.length > 0 && !state.nearMeMode) {
+    const bounds = L.latLngBounds(withCoords.map(s => [s.lat, s.lng]));
+    mapDesktop.fitBounds(bounds, { padding: [30,30], maxZoom: 16 });
+    mapMobile.fitBounds(bounds, { padding: [30,30], maxZoom: 16 });
+  }
+}
+
+function syncAll() {
+  const items = getFilteredAll();
+  const totalPages = calcTotalPages(items.length);
+  page = clampPage(page, totalPages);
+
+  renderList(items);
+  renderMarkers(items);
+}
+
+/* =========================
+   Events
+========================= */
+function setQuery(q) { state.q = q || ""; page = 1; syncAll(); }
+const handleSearch = debounce((e) => setQuery(e.target.value), 300);
+
+document.getElementById("qTop").addEventListener("input", handleSearch);
+document.getElementById("qMobile").addEventListener("input", handleSearch);
+
+document.getElementById("sortSelect").addEventListener("change", (e) => {
+  state.sortMode = e.target.value || "updated";
+  page = 1;
+  syncAll();
+});
+
+document.querySelectorAll(".tagChip").forEach(btn => {
+  btn.addEventListener("click", () => {
+    const tag = btn.getAttribute("data-tag");
+    const active = state.activeTags.has(tag);
+    if (active) state.activeTags.delete(tag); else state.activeTags.add(tag);
+    btn.classList.toggle("border-primary", !active);
+    btn.classList.toggle("text-primary", !active);
+    btn.classList.toggle("bg-primary/10", !active);
+    page = 1;
+    syncAll();
+  });
+});
+
+document.getElementById("btnNearMe").addEventListener("click", () => {
+  if (location.protocol !== "https:" && location.hostname !== "localhost") { alert("Near Me 需要 HTTPS。"); return; }
+  if (!navigator.geolocation) return alert("不支援定位");
+  navigator.geolocation.getCurrentPosition(pos => {
+    state.userLoc = { lat: pos.coords.latitude, lng: pos.coords.longitude };
+    state.nearMeMode = true;
+    setUserMarker(state.userLoc.lat, state.userLoc.lng);
+    mapDesktop.setView([state.userLoc.lat, state.userLoc.lng], 15);
+    mapMobile.setView([state.userLoc.lat, state.userLoc.lng], 15);
+    page = 1;
+    syncAll();
+  }, () => alert("定位失敗"));
+});
+
+document.getElementById("btnLocateDesktop")?.addEventListener("click", () => document.getElementById("btnNearMe").click());
+document.getElementById("btnLocateMobile")?.addEventListener("click", () => document.getElementById("btnNearMe").click());
+document.getElementById("btnZoomInDesktop")?.addEventListener("click", () => mapDesktop.zoomIn());
+document.getElementById("btnZoomOutDesktop")?.addEventListener("click", () => mapDesktop.zoomOut());
+document.getElementById("btnZoomInMobile")?.addEventListener("click", () => mapMobile.zoomIn());
+document.getElementById("btnZoomOutMobile")?.addEventListener("click", () => mapMobile.zoomOut());
+
+document.getElementById("btnHasCoords").addEventListener("click", (e) => {
+  state.requireCoords = !state.requireCoords;
+  e.currentTarget.classList.toggle("border-primary", state.requireCoords);
+  e.currentTarget.classList.toggle("text-primary", state.requireCoords);
+  e.currentTarget.classList.toggle("bg-primary/10", state.requireCoords);
+  page = 1;
+  syncAll();
+});
+
+document.getElementById("btnReset").addEventListener("click", () => {
+  state.q = "";
+  state.activeTags.clear();
+  state.nearMeMode = false;
+  state.userLoc = null;
+  state.requireCoords = false;
+
+  state.sortMode = "updated";
+  document.getElementById("sortSelect").value = "updated";
+
+  page = 1;
+
+  document.getElementById("qTop").value = "";
+  document.getElementById("qMobile").value = "";
+  document.querySelectorAll(".tagChip").forEach(btn => btn.classList.remove("border-primary", "text-primary", "bg-primary/10"));
+  document.getElementById("btnHasCoords").classList.remove("border-primary","text-primary","bg-primary/10");
+  syncAll();
+});
+
+document.getElementById("list").addEventListener("click", (e) => {
+  const favBtn = e.target.closest(".btnFav");
+  if (favBtn) {
+    e.stopPropagation();
+    const id = favBtn.getAttribute("data-fav");
+    const favs = getFavSet();
+    if (favs.has(id)) favs.delete(id); else favs.add(id);
+    saveFavSet(favs);
+    syncAll();
+    return;
+  }
+
+  const card = e.target.closest(".salonCard");
+  if (card) {
+    const id = card.getAttribute("data-id");
+    const s = SALONS.find(x => x.id === id);
+    if (s && Number.isFinite(s.lat) && Number.isFinite(s.lng)) {
+      mapDesktop.setView([s.lat, s.lng], 17);
+      mapMobile.setView([s.lat, s.lng], 17);
+      layerDesktop.eachLayer(l => { if (l._salonId === id) l.openPopup(); });
+      layerMobile.eachLayer(l => { if (l._salonId === id) l.openPopup(); });
+      if (window.innerWidth < 768) document.getElementById("tabMap").click();
+    } else {
+      alert("未能找到地址，地圖無法顯示");
+    }
+  }
+});
+
+/* Mobile tabs */
+const panelList = document.getElementById("panelList");
+const panelMapMobile = document.getElementById("panelMapMobile");
+const tabList = document.getElementById("tabList");
+const tabMap = document.getElementById("tabMap");
+
+tabList.addEventListener("click", () => {
+  panelList.classList.remove("hidden");
+  panelMapMobile.classList.add("hidden");
+  tabList.classList.add("bg-text-main","text-white");
+  tabList.classList.remove("text-text-main");
+  tabMap.classList.remove("bg-text-main","text-white");
+  tabMap.classList.add("text-text-main");
+});
+
+tabMap.addEventListener("click", () => {
+  panelList.classList.add("hidden");
+  panelMapMobile.classList.remove("hidden");
+  tabMap.classList.add("bg-text-main","text-white");
+  tabMap.classList.remove("text-text-main");
+  tabList.classList.remove("bg-text-main","text-white");
+  tabList.classList.add("text-text-main");
+
+  requestAnimationFrame(() => {
+    mapMobile.invalidateSize();
+    const items = getFilteredAll().filter(s => Number.isFinite(s.lat));
+    if (items.length) {
+      const bounds = L.latLngBounds(items.map(s => [s.lat, s.lng]));
+      mapMobile.fitBounds(bounds, { padding: [50,50], maxZoom: 16 });
+    }
+  });
+});
+
+window.addEventListener("resize", () => {
+  requestAnimationFrame(() => {
+    mapDesktop.invalidateSize();
+    mapMobile.invalidateSize();
+  });
+});
+
+/* =========================
+   Boot
+========================= */
+async function load() {
+  try {
+    const res = await fetch(API_URL, { cache: "no-store" });
+    const data = await res.json();
+    const rows = Array.isArray(data) ? data : (data.salons || []);
+
+    if (rows.length > 0) console.log("🔥 API Raw Data Sample:", rows[0]);
+
+    SALONS = rows.map(normalizeSalon);
+
+    const warns = (data.warnings || []);
+    if (warns.length) {
+      document.getElementById("bannerWarn").classList.remove("hidden");
+      document.getElementById("warnText").textContent = `Warnings: ${warns.length} items (Check Console)`;
+      console.warn(warns);
+    }
+
+    syncAll();
+  } catch (e) {
+    console.error(e);
+    alert("Load failed: " + e.message);
+  }
+}
+load();
+</script>
+</body>
+</html>
